@@ -1,0 +1,27 @@
+** MonMob project.
+
+This is a set of tools to provide monitor mode and raw frame injection for devices using broadcom chipsets 
+bcm4325, bcm4329 and bcm4330.
+
+
+** Supported Versions:
+iphone 4 - 5.0.1, 5.1.1
+ipad 1 - 5.0.1, 5.1.1
+ipad 2 - 5.0.1, 5.1.1
+
+Galaxy Tab - 3.4
+Nexus S - 3.4
+
+** Files
+
+patcher/
+	scripts to modify firmware.
+tools/
+	monitor-mode-magic.py
+
+	iOS/
+		server
+		UI
+
+** greetings
+

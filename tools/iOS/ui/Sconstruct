@@ -1,0 +1,19 @@
+
+
+from os import path
+
+platform   = "/Developer/Platforms/iPhoneOS.platform/Developer/" 
+sdk        = path.join(platform, "SDKs/iPhoneOS4.3.sdk")
+cc         = path.join(platform, "usr/bin/arm-apple-darwin10-g++-4.2.1")
+ccInclude  = path.join(platform, "usr/lib/gcc/arm-apple-darwin10/4.2.1/include")
+ccLib	   = path.join(sdk, "usr/lib")
+privateFra = path.join(sdk, "System/Library/PrivateFrameworks")
+
+ccflags = " -g -Wall -march=armv6 -mcpu=arm1176jzf-s -isysroot %s -I%s" % (sdk, ccInclude)
+
+ldflags = "-march=armv6 -mcpu=arm1176jzf-s -L%s -framework CoreFoundation -framework Foundation -framework CoreGraphics -framework UIKit -isysroot %s -bind_at_load -multiply_defined suppress -lobjc " % (ccLib, sdk)
+
+objs = Glob('*.m')
+Program('FAFAWifi', objs, CC=cc, CCFLAGS=ccflags, LINKFLAGS=ldflags)
+
+
