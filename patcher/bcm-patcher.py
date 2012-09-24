@@ -1,4 +1,5 @@
 #!/usr/bin/python
+from __future__ import with_statement
 
 # Copyright (c) 2012, Andres Blanco and Matias Eissler
 # All rights reserved.
