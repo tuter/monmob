@@ -1,4 +1,5 @@
 #!/usr/bin/python
+
 from __future__ import with_statement
 
 # Copyright (c) 2012, Andres Blanco and Matias Eissler
@@ -30,111 +31,134 @@ from __future__ import with_statement
 # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
+import os
 import sys
 import shutil
-import os
 
-from struct import pack
 from zlib import crc32
+from struct import pack
 from hashlib import sha1
 
+
 def getSignature(firmware_data):
+    """Function that returns the signature of a broadcom combo solution
+       firmware."""
     start = firmware_data[:-2].rfind('\x00') + 1
     ret = firmware_data[start:]
     if not 'Version' in ret or not 'Date' in ret:
         raise Exception("Invalid signature")
     return ret
 
+
 def getToken(signature, token, end_char):
+    """Function that returns an string with the value of the token."""
     start = signature.find(token) + len(token)
     end = signature.find(end_char, start)
     return signature[start:end]
 
+
 def getChipset(signature):
+    """Function that returns the chipset present on the signature."""
     return getToken(signature, '', '/')
 
+
 def getVersion(signature):
+    """Function that returns the version present on the signature."""
     return getToken(signature, "Version: ", ' ')
 
+
 def getDate(signature):
+    """Function that returns the date present on the signature."""
     return getToken(signature, "Date: ", '\x00')
 
-def readDiff(fname):
-    changes = []
 
+def readDiff(fname):
+    """Function that returns a list of changes based on a IDA dif file."""
+    changes = []
     with open(fname, "r") as f:
         for line in f:
             if ':' in line:
                 offset, diff = line.split(':')
                 before, after = diff.lstrip().split(' ')
                 after = after.rstrip()
-
                 offset = int(offset, 16)
                 before = int(before, 16)
                 after  = int(after , 16)
-
                 changes.append( (offset, before, after) )
-
     return changes
 
 
-    
-
 def patch(orig_fname, diff_fname, dest_fname, crc_offset):
-#    crcoffset = 0x044E80        # Iphone 3Gs - 5.0.1
-    crcoffset = 0x0409A9 - 4    # Ipad   1   - 5.0.1
-#    crcoffset = 0x042170 - 4    # Galaxy tab - ??
-
-    # read original firmare.
+    """TODO"""
+    # Read original firmare.
     origdata = ''
     with open(orig_fname, "rb") as f:
         origdata = f.read()
-        if pack("<l", crc32(origdata[:crc_offset]))[:4] != origdata[crc_offset:crc_offset+4]:
-            raise Exception("checksum mismatch!")
-        print "checksum ok!"
-
-    # read list of changes to do.
+        checksum = pack("<l", crc32(origdata[:crc_offset]))[:4]
+        if checksum != origdata[crc_offset:crc_offset+4]:
+            raise Exception("Checksum mismatch!")
+        print "Checksum ok!"
     
+    # Read list of changes to do.
     changes = readDiff(diff_fname)
    
-    # apply changes.
+    # Apply changes.
     newdata = origdata[:]
     for offset, before, after in changes:
         if origdata[offset] != chr(before):
-            raise Exception("data mismatch at %x expecting %x found %x" % (offset, before, origdata[offset]))
+            byte = origdata[offset]
+            msg = "Data mismatch at %X expecting %X found %X" % (offset,
+                                                                 before,
+                                                                 byte)
+            raise Exception(msg)
         newdata = newdata[:offset] + chr(after) + newdata[offset+1:]
     
-    # fix checksum
+    # Fix checksum
     newchecksum = pack("<l", crc32(newdata[:crc_offset]))[:4]
     newdata = newdata[:crc_offset] + newchecksum + newdata[crc_offset+4:]
     
-    # write new file
+    # Write new file
     with open(dest_fname, "wb") as f:
         f.write(newdata)
 
+
 def backup(fname):
+    """Function that backups the file fname adding the "-backup" string at the
+       end of the file name."""
     shutil.copy(fname, fname + '-backup')
 
+
 def check_file(fname, msg):
+    """Function that checks for fname file and shows msg string in case the
+       file was not found."""
     if not os.path.exists(fname):
         print ("Error: %s" % msg)
         sys.exit(1)
 
 
 if __name__ == "__main__":
+    
+    # Supported Devices:
+    #
+    # + 79232dc60d97b01b5c986269172f485de23f5142 - iPad 1 iOS 5.0.1
+    # + b374e35592399a14347c437ff32df17fb5b2880a - iPad 2 iOS 5.1.1
+    #
+    
     crc_offsets = {
-        "79232dc60d97b01b5c986269172f485de23f5142": 0x0409A9 - 4  # Ipad   1   - 5.0.1
+        "79232dc60d97b01b5c986269172f485de23f5142" : 0x000409A9 - 4,
+        "b374e35592399a14347c437ff32df17fb5b2880a" : 0x00043DD3 - 4,
     }
-
+    
     if len(sys.argv) != 2:
-        print "Usage: bcm_patcher firmware_file\n"
+        print "Usage:"
+        print "\tbcm_patcher <firmware_file>\n"
         sys.exit(1)
-
+    
     firmware_data = ''
     firmware_fname = sys.argv[1]
     check_file(firmware_fname, 'firmware file not found')
     backup(firmware_fname)
-
+    
     with open(firmware_fname, 'rb') as f:
         firmware_data = f.read()
     
@@ -143,11 +167,10 @@ if __name__ == "__main__":
     print '\tChipset:', getChipset(signature)
     print '\tVersion:', getVersion(signature)
     print '\tDate:', getDate(signature)
-
+    
     hash_str = sha1(firmware_data).hexdigest()
     diff_fname = hash_str + '.diff'
     check_file(diff_fname, 'diff file not found (unsupported firmware?)')
    
     crcoffset = crc_offsets[hash_str]
     patch(firmware_fname, diff_fname, firmware_fname, crcoffset)
-
